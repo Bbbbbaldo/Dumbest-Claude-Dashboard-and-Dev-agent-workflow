@@ -94,6 +94,19 @@ td { padding: 5px 6px; border-top: 1px solid var(--line); vertical-align: top; }
 td.n { white-space: nowrap; width: 1%; }
 .tag { display: inline-block; font-size: 11px; background: var(--soft); border-radius: 4px; padding: 0 6px; margin-right: 4px; color: var(--muted); }
 .tag.forte { background: var(--wait-bg); color: var(--wait); }
+.selettore { position: relative; }
+.selettore > summary { list-style: none; padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); font-size: 12.5px; font-weight: 600; }
+.selettore > summary::-webkit-details-marker { display: none; }
+.selettore[data-filtro] > summary { border-color: var(--run); color: var(--run); }
+#progetti-lista { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 260px; max-height: 70vh; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 8px; font-size: 13px; }
+#progetti-lista label { display: flex; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
+#progetti-lista label:hover { background: var(--soft); }
+#progetti-lista label .muted { margin-left: auto; font-size: 11.5px; }
+#progetti-lista hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+#progetti-lista .nota { font-size: 11.5px; padding: 4px 6px 0; }
+.sess .campana { padding: 0 5px; font-size: 12px; line-height: 1.4; border-color: transparent; background: transparent; }
+.sess .campana:hover { border-color: var(--line); }
+.sess.silenziata { opacity: .7; }
 .tag.male { background: var(--bad-bg); color: var(--bad); font-weight: 600; }
 .task.conflitto { box-shadow: inset 3px 0 0 var(--bad); }
 .conflitti { grid-column: 1 / -1; font-size: 12.5px; color: var(--bad); background: var(--bad-bg); border-radius: 6px; padding: 6px 10px; margin-top: 4px; }
@@ -180,6 +193,7 @@ h4 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); font-weight: 600;
 <body>
 <header>
   <h1>Cruscotto agenti</h1>
+  <details id="progetti" class="selettore"><summary title="Progetti da mostrare e per cui ricevere notifiche"><span id="progetti-titolo">Tutti i progetti</span> ▾</summary><div id="progetti-lista"></div></details>
   <div class="stats" id="stats"></div>
   <div class="spacer"></div>
   <span class="muted" id="ora" style="font-size:12px"></span>
@@ -260,14 +274,17 @@ function sessione(s, opz = {}) {
     `cwd: ${s.cwd}`, `pid ${s.pid ?? '?'} · sessione ${s.sessionId} · v${s.versione || '?'}`,
     s.fonte === 'hook' ? `stato dagli hook (macchina ${s.host})` : 'stato dal registro interno di Claude Code (sessione nata prima degli hook)',
   ].filter(Boolean).join('\n\n');
-  return `<div class="sess ${cls}" title="${esc(titolo)}">
+  const campana = s.sessionId ? `<button class="campana" data-silenzia="${esc(s.sessionId)}" title="${s.silenziata
+    ? 'Silenziata: l\'app non manda notifiche per questa sessione. Clic per riattivarle.'
+    : 'Clic per silenziare: l\'app non manderà più notifiche per questa sessione.'}">${s.silenziata ? '🔕' : '🔔'}</button>` : '';
+  return `<div class="sess ${cls}${s.silenziata ? ' silenziata' : ''}" title="${esc(titolo)}">
     <div class="riga1"><span class="dot"></span><span class="orig">${esc(s.origine)}</span>
       <span>${etichetta}</span>
       ${s.locale === false ? `<span class="tag">${esc(s.host)}</span>` : ''}
       ${s.branch ? `<code>${esc(s.branch)}</code>` : `<span class="muted">${esc(s.cartella)}</span>`}
       ${s.chatCruscotto ? '<span class="tag forte">chat del cruscotto</span>' : ''}
       ${opz.extra || ''}
-      <span class="spacer"></span><span class="muted">pid ${s.pid}</span></div>
+      <span class="spacer"></span>${campana}<span class="muted">pid ${s.pid}</span></div>
     ${att ? `<div class="att">${att}</div>` : ''}
   </div>`;
 }
@@ -364,7 +381,74 @@ function blocchiRepo(r) {
   return html;
 }
 
+// ---------------------------------------------------------------- progetti seguiti
+
+let ultimoStato = null;
+
+function renderProgetti(d, forza = false) {
+  const box = document.getElementById('progetti');
+  const tutti = !d.seguiti;
+  const scelti = d.progetti.filter((p) => p.seguito);
+  document.getElementById('progetti-titolo').textContent = tutti ? 'Tutti i progetti'
+    : scelti.length === 1 ? scelti[0].nome : `${scelti.length} progetti`;
+  if (tutti) delete box.dataset.filtro; else box.dataset.filtro = '1';
+  if (box.open && !forza) return; // non ridisegnare mentre si sceglie
+  const fuori = d.fuoriFiltro ? `<span class="muted">${d.fuoriFiltro} sessioni escluse</span>` : '';
+  document.getElementById('progetti-lista').innerHTML = `
+    <label><input type="checkbox" data-tutti ${tutti ? 'checked' : ''}> <b>Tutti i progetti</b>${tutti ? '' : fuori}</label>
+    <hr>
+    ${d.progetti.map((p) => `<label><input type="checkbox" data-radice="${esc(p.radice)}" ${!tutti && p.seguito ? 'checked' : ''}>
+      ${esc(p.nome)}<span class="muted">${p.sessioni ? `${p.sessioni} sessioni` : ''}</span></label>`).join('')}
+    <div class="muted nota">Con una scelta, il cruscotto mostra solo questi progetti e l'app notifica solo le loro sessioni e chat.</div>
+    <hr>
+    <label><input type="checkbox" data-solo-task ${d.soloTask ? 'checked' : ''}> Notifiche solo per le sessioni dei task (con un'issue)</label>
+    <div class="muted nota">Una sessione singola si silenzia con 🔔 sulla sua scheda.</div>`;
+}
+
+document.getElementById('progetti-lista').addEventListener('change', async (e) => {
+  const lista = document.getElementById('progetti-lista');
+  if (e.target.hasAttribute('data-solo-task')) {
+    try { await post('/api/preferenze', { soloTask: e.target.checked }); await aggiorna(); } catch (err) {
+      document.getElementById('ora').textContent = 'errore: ' + err.message;
+    }
+    return;
+  }
+  let seguiti;
+  if (e.target.hasAttribute('data-tutti')) {
+    seguiti = null;
+  } else {
+    seguiti = [...lista.querySelectorAll('input[data-radice]:checked')].map((x) => x.dataset.radice);
+    if (!seguiti.length) seguiti = null;
+  }
+  try {
+    await post('/api/preferenze', { seguiti });
+    await aggiorna();
+    if (ultimoStato) renderProgetti(ultimoStato, true);
+  } catch (err) {
+    document.getElementById('ora').textContent = 'errore: ' + err.message;
+  }
+});
+
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-silenzia]');
+  if (!b || !ultimoStato) return;
+  e.stopPropagation();
+  const id = b.dataset.silenzia;
+  const insieme = new Set(ultimoStato.silenziate || []);
+  if (insieme.has(id)) insieme.delete(id); else insieme.add(id);
+  try { await post('/api/preferenze', { silenziate: [...insieme] }); await aggiorna(); } catch (err) {
+    document.getElementById('ora').textContent = 'errore: ' + err.message;
+  }
+});
+
+document.addEventListener('click', (e) => {
+  const box = document.getElementById('progetti');
+  if (box.open && !box.contains(e.target)) box.open = false;
+});
+
 function render(d) {
+  ultimoStato = d;
+  renderProgetti(d);
   const t = d.totali;
   const origini = Object.entries(t.perOrigine).map(([k, v]) => `${esc(k)} ${v}`).join(' · ');
   document.getElementById('stats').innerHTML = `
@@ -390,6 +474,7 @@ function render(d) {
     html += `<section class="repo"><h2>Fuori da un repo git</h2><div class="griglia-sess">${d.fuoriRepo.map((s) => sessione(s, { extra: `<span class="muted">${esc(s.cwd.replace(/^\/Users\/[^/]+/, '~'))}</span>` })).join('')}</div></section>`;
   }
   if (!d.repos.length && !d.fuoriRepo.length) html += '<div class="vuoto">Nessuna sessione Claude Code viva.</div>';
+  if (d.seguiti && d.fuoriFiltro) html += `<div class="vuoto">${d.fuoriFiltro} sessioni di altri progetti non mostrate: cambia la scelta in alto.</div>`;
 
   const aperti = new Set([...document.querySelectorAll('details[open]')].map((x) => x.dataset.id));
   const root = document.getElementById('root');

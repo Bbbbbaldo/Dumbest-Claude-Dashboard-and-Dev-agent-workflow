@@ -20,6 +20,8 @@ struct SessInfo: Decodable, Identifiable, Equatable {
     let cartella: String
     let issue: Int?
     let chatCruscotto: Bool?
+    /// false = silenziata dalla pagina o esclusa da "solo task": niente notifiche né badge
+    let notifica: Bool?
     var id: Int { pid }
     var etichetta: String { issue.map { "#\($0) · \(cartella)" } ?? (nome ?? cartella) }
 }
@@ -47,6 +49,8 @@ struct StatoServer: Decodable {
     let totali: Totali
     let sessioni: [SessInfo]?
     let conflitti: [ConflittoInfo]?
+    /// progetti seguiti (radici dei repo); nil = tutti
+    let seguiti: [String]?
 }
 
 /// Stato condiviso dell'app: interroga il server, aggiorna barra dei menu, badge e notifiche,
@@ -78,7 +82,7 @@ final class StatoApp: NSObject, ObservableObject {
 
     /// permessi in attesa: delle chat del cruscotto più delle altre sessioni (stato dagli hook)
     var permessi: Int { chat.reduce(0) { $0 + $1.permessiInAttesa } + sessioniInAttesa.count }
-    var sessioniInAttesa: [SessInfo] { sessioni.filter { $0.stato == "permesso" && $0.chatCruscotto != true } }
+    var sessioniInAttesa: [SessInfo] { sessioni.filter { $0.stato == "permesso" && $0.chatCruscotto != true && $0.notifica != false } }
     var chatInAttesa: [ChatInfo] { chat.filter { $0.permessiInAttesa > 0 } }
     var sessioniAlLavoro: [SessInfo] { sessioni.filter { $0.stato == "busy" && $0.chatCruscotto != true } }
 
@@ -106,8 +110,8 @@ final class StatoApp: NSObject, ObservableObject {
     func giro() async {
         async let c: [ChatInfo]? = server.leggi("/api/chat")
         async let s: StatoServer? = server.leggi("/api/stato")
-        let (nuoveChat, nuovoStato) = await (c, s)
-        guard let nuoveChat, let nuovoStato else {
+        let (tutteLeChat, nuovoStato) = await (c, s)
+        guard let tutteLeChat, let nuovoStato else {
             raggiungibile = false
             fallimenti += 1
             if fallimenti >= 2 {
@@ -120,6 +124,9 @@ final class StatoApp: NSObject, ObservableObject {
         if !raggiungibile && !primoGiro { webView.reload() }
         raggiungibile = true
         fallimenti = 0
+        // le sessioni arrivano già filtrate dal server; le chat del cruscotto si filtrano qui
+        let seguiti = nuovoStato.seguiti.map(Set.init)
+        let nuoveChat = seguiti.map { s in tutteLeChat.filter { s.contains($0.repo) } } ?? tutteLeChat
         let nuoveSessioni = nuovoStato.sessioni ?? []
 
         let nuoviConflitti = nuovoStato.conflitti ?? []
@@ -150,7 +157,7 @@ final class StatoApp: NSObject, ObservableObject {
                 notifica("Chat: risposta pronta", c.titolo, chat: c.id)
             }
         }
-        for s in nuoveSess where s.chatCruscotto != true {
+        for s in nuoveSess where s.chatCruscotto != true && s.notifica != false {
             if s.stato == "permesso" && statiSessioni[s.pid] != "permesso" {
                 notifica("Sessione chiede un permesso: \(s.etichetta)", "\(s.origine) · aspetta la tua approvazione", chat: nil)
             } else if statiSessioni[s.pid] == "busy" && s.stato == "idle" {

@@ -12,7 +12,7 @@
 // tutta la lettura sta in leggiSessioni() e ultimaAttivita().
 
 import http from 'node:http';
-import { readFile, readdir, stat, open } from 'node:fs/promises';
+import { readFile, readdir, stat, open, writeFile, mkdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
@@ -443,9 +443,29 @@ async function costruisciStato() {
     return descriviSessione(s, git, att);
   }));
 
+  // notifica = l'app avvisa per questa sessione (se il suo progetto è seguito):
+  // non se l'hai silenziata, e con "solo task" solo se lavora su un'issue
+  const silenziate = new Set(preferenze.silenziate || []);
+  for (const s of sessioni) {
+    s.silenziata = silenziate.has(s.sessionId);
+    s.notifica = !s.silenziata && (!preferenze.soloTask || !!s.issue);
+  }
+
   const radici = new Set(cfg.repos.map(espandi));
   for (const s of sessioni) if (s.repo) radici.add(s.repo);
   for (const n of nascosti) radici.delete(n);
+
+  // Progetti seguiti (scelti dalla pagina): con un filtro si mostrano e si contano solo quelli,
+  // così anche le notifiche dell'app ignorano le sessioni degli altri progetti.
+  const seguiti = preferenze.seguiti ? new Set(preferenze.seguiti) : null;
+  if (seguiti) for (const r of seguiti) if (!nascosti.has(r)) radici.add(r);
+  const progetti = [...radici]
+    .map((r) => ({ radice: r, nome: path.basename(r), sessioni: sessioni.filter((s) => s.repo === r).length, seguito: !seguiti || seguiti.has(r) }))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+  // una sessione senza repo (per esempio in un worktree già cancellato) appartiene al progetto che contiene la sua cartella
+  const radiceDaPercorso = (cwd) => progetti.find((p) => cwd === p.radice || String(cwd).startsWith(p.radice + '/'))?.radice;
+  const seguita = (s) => !seguiti || (s.repo && !nascosti.has(s.repo) ? seguiti.has(s.repo) : seguiti.has(radiceDaPercorso(s.cwd)));
+  if (seguiti) for (const r of [...radici]) if (!seguiti.has(r)) radici.delete(r);
 
   const repos = await Promise.all([...radici].map(async (radice) => {
     const sessRepo = sessioni.filter((s) => s.repo === radice);
@@ -603,7 +623,8 @@ async function costruisciStato() {
     || sessioni.filter((s) => s.repo === b.radice).length - sessioni.filter((s) => s.repo === a.radice).length
     || a.nome.localeCompare(b.nome));
 
-  const fuoriRepo = sessioni.filter((s) => !s.repo || nascosti.has(s.repo));
+  const fuoriRepo = sessioni.filter((s) => (!s.repo || nascosti.has(s.repo)) && seguita(s));
+  const visibili = sessioni.filter(seguita);
   const daChiudere = repos.reduce((n, r) => n + r.altreSessioni.filter((s) => s.daChiudere).length, 0);
   // elenco piatto dei conflitti, per i contatori e le notifiche dell'app
   const conflitti = [];
@@ -619,23 +640,29 @@ async function costruisciStato() {
   return {
     generato: new Date().toISOString(),
     totali: {
-      sessioni: sessioni.length,
-      lavorano: sessioni.filter((s) => s.stato === 'busy').length,
-      permessi: sessioni.filter((s) => s.stato === 'permesso').length,
-      ferme: sessioni.filter((s) => s.stato !== 'busy' && s.stato !== 'permesso').length,
-      daHook: sessioni.filter((s) => s.fonte === 'hook').length,
+      sessioni: visibili.length,
+      lavorano: visibili.filter((s) => s.stato === 'busy').length,
+      permessi: visibili.filter((s) => s.stato === 'permesso').length,
+      ferme: visibili.filter((s) => s.stato !== 'busy' && s.stato !== 'permesso').length,
+      daHook: visibili.filter((s) => s.fonte === 'hook').length,
       daChiudere,
       conflitti: conflitti.length,
-      perOrigine: sessioni.reduce((m, s) => ({ ...m, [s.origine]: (m[s.origine] || 0) + 1 }), {}),
+      perOrigine: visibili.reduce((m, s) => ({ ...m, [s.origine]: (m[s.origine] || 0) + 1 }), {}),
     },
     repos,
     fuoriRepo,
     conflitti,
+    progetti,
+    seguiti: preferenze.seguiti,
+    silenziate: preferenze.silenziate || [],
+    soloTask: !!preferenze.soloTask,
+    fuoriFiltro: sessioni.length - visibili.length,
     // elenco piatto per l'app della barra dei menu
-    sessioni: sessioni.map((s) => ({
+    sessioni: visibili.map((s) => ({
       sessionId: s.sessionId, fonte: s.fonte, host: s.host,
       pid: s.pid, nome: s.nome, origine: s.origine, stato: s.stato, cartella: s.cartella,
       issue: s.issue, repo: s.repo, branch: s.branch, chatCruscotto: s.chatCruscotto, daQuando: s.daQuando,
+      notifica: s.notifica, silenziata: s.silenziata,
     })),
     config: cfg._file || null,
     errori,
@@ -796,6 +823,38 @@ const collettore = new Collettore({
 });
 await collettore.carica();
 
+// Preferenze della pagina. seguiti = null: tutti i progetti; altrimenti le radici dei repo seguiti.
+const FILE_PREFERENZE = path.join(QUI, 'dati', 'preferenze.json');
+let preferenze = { seguiti: null, silenziate: [], soloTask: false };
+try { preferenze = { ...preferenze, ...JSON.parse(await readFile(FILE_PREFERENZE, 'utf8')) }; } catch {}
+
+// Si aggiornano solo le chiavi presenti: seguiti, silenziate (id di sessione), soloTask.
+async function salvaPreferenze(nuove) {
+  if (!nuove || typeof nuove !== 'object') throw new Error('preferenze non valide');
+  const p = { ...preferenze };
+  if ('seguiti' in nuove) {
+    const s = nuove.seguiti;
+    const valido = s === null || (Array.isArray(s) && s.length <= 100
+      && s.every((x) => typeof x === 'string' && x.length < 1000 && path.isAbsolute(x)));
+    if (!valido) throw new Error('seguiti: null oppure un elenco di percorsi assoluti');
+    p.seguiti = s === null || !s.length ? null : [...new Set(s)];
+  }
+  if ('silenziate' in nuove) {
+    const s = nuove.silenziate;
+    if (!Array.isArray(s) || s.length > 500 || !s.every((x) => typeof x === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(x))) {
+      throw new Error('silenziate: elenco di id di sessione');
+    }
+    p.silenziate = [...new Set(s)].slice(-200);
+  }
+  if ('soloTask' in nuove) {
+    if (typeof nuove.soloTask !== 'boolean') throw new Error('soloTask: true o false');
+    p.soloTask = nuove.soloTask;
+  }
+  preferenze = p;
+  await mkdir(path.dirname(FILE_PREFERENZE), { recursive: true });
+  await writeFile(FILE_PREFERENZE, JSON.stringify(preferenze, null, 2));
+}
+
 // POST /api/eventi dagli hook (hooks/cruscotto.sh). Niente Origin: viene da curl, si autentica col token.
 async function riceviEvento(req, res) {
   if (req.method !== 'POST') return json(res, 405, { errore: 'solo POST' });
@@ -859,6 +918,12 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/chat' || url.pathname.startsWith('/api/chat/')) {
       try { await gestisciChat(req, res, url); } catch (e) { if (!res.headersSent) json(res, 400, { errore: String(e.message || e) }); }
       return;
+    }
+    if (url.pathname === '/api/preferenze') {
+      if (req.method === 'GET') return json(res, 200, preferenze);
+      if (!azioneAmmessa(req)) return json(res, 403, { errore: 'richiesta non ammessa' });
+      try { await salvaPreferenze(await corpoJson(req)); } catch (e) { return json(res, 400, { errore: String(e.message || e) }); }
+      return json(res, 200, preferenze);
     }
     if (url.pathname === '/api/avvia') {
       if (!azioneAmmessa(req)) {

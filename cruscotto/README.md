@@ -109,6 +109,21 @@ corregge `leggiSessioni()` / `ultimaAttivita()` in `server.mjs`.
   compaiono "▶ Avvia sessione" e "copia comando".
 - `terminale`: `"Terminal"` (default) o `"iTerm"`, dove si apre la sessione avviata dal cruscotto.
 
+## Progetti seguiti
+
+Il menu "Tutti i progetti ▾" in alto sceglie quali progetti seguire. Con una scelta:
+
+- il cruscotto mostra solo quei progetti, e i contatori contano solo le loro sessioni;
+- l'app manda notifiche, badge e voci di menu solo per le loro sessioni e chat;
+- una sessione la cui cartella non è più un repo git (per esempio un worktree cancellato) conta per il progetto che
+  contiene la cartella.
+
+Una sessione singola si silenzia con 🔔 sulla sua scheda (clic di nuovo per riattivarla): resta visibile, ma
+l'app non manda notifiche né badge per lei. Nel menu dei progetti c'è anche "Notifiche solo per le sessioni dei
+task", per ignorare le sessioni non legate a un'issue.
+
+La scelta sta in `dati/preferenze.json` (`GET`/`POST /api/preferenze`: `seguiti`, `null` = tutti; `silenziate`; `soloTask`).
+
 ## Modifiche di un task
 
 "Vedi modifiche" (su ogni task con worktree o PR) apre un pannello con:
