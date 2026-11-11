@@ -1,4 +1,7 @@
-# flusso-agenti
+# Dumbest Claude Dashboard and Dev agent workflow
+
+Plugin `flusso-agenti` per Claude Code.
+
 
 Un flusso di sviluppo con agenti Claude Code, in italiano: da una richiesta scritta a parole a issue atomiche,
 eseguite in parallelo da sessioni separate (una per worktree), con test, revisione indipendente e documentazione
@@ -46,7 +49,7 @@ richiesta ──/pianifica──▶ branch piano/<nome> + PR in bozza verso main
 Serve [Claude Code](https://docs.claude.com/en/docs/claude-code) e `gh` autenticato.
 
 ```
-/plugin marketplace add Bbbbbaldo/flusso-agenti
+/plugin marketplace add Bbbbbaldo/Dumbest-Claude-Dashboard-and-Dev-agent-workflow
 /plugin install flusso-agenti@flusso-agenti
 ```
 

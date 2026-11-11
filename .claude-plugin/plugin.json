@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Flusso di sviluppo con agenti Claude Code: /pianifica spezza una richiesta in issue atomiche, /task le esegue una per worktree con test, PR e revisione; hook che proteggono il branch principale; eventi per il cruscotto delle sessioni.",
   "author": { "name": "Bbbbbaldo" },
-  "repository": "https://github.com/Bbbbbaldo/flusso-agenti",
+  "repository": "https://github.com/Bbbbbaldo/Dumbest-Claude-Dashboard-and-Dev-agent-workflow",
   "license": "MIT",
   "keywords": ["workflow", "issue", "worktree", "pull-request", "agenti", "italiano"]
 }
