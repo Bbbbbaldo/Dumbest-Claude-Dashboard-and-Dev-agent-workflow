@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Controllo rapido prima di un commit feat/fix: pochi secondi, nessun
+# database, così più operai possono fare commit in parallelo senza
+# pestarsi i piedi. I controlli pesanti (integrazione, suite lente)
+# girano in CI prima del deploy, non qui.
+#
+# Attivazione, una volta per clone:  git config core.hooksPath .githooks
+# Adatta i comandi in fondo al tuo progetto.
+set -euo pipefail
+
+oggetto=$(head -n1 "$1")
+if ! [[ "$oggetto" =~ ^(feat|fix)(\(.+\))?!?: ]]; then
+  exit 0
+fi
+
+radice=$(git rev-parse --show-toplevel)
+echo "▸ $oggetto — controllo rapido"
+
+# --- da adattare ---------------------------------------------------------
+(cd "$radice/frontend" && npm run -s typecheck) \
+  || { echo "✗ typecheck rosso: commit annullato"; exit 1; }
+(cd "$radice/backend" && .venv/bin/python -m pytest -q -x tests/unit) \
+  || { echo "✗ test unit rossi: commit annullato"; exit 1; }
+# -------------------------------------------------------------------------
+
+echo "✓ controllo rapido verde"

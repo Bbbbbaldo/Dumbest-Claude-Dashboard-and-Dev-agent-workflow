@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cruscotto agenti</title>
+<style>
+:root {
+  --bg: #f6f6f4; --card: #ffffff; --line: #e3e2de; --text: #1d1d1b; --muted: #6b6a66; --soft: #f0efeb;
+  --ok: #2f7d4f; --ok-bg: #e3f2e8;
+  --run: #1f5fbf; --run-bg: #e2ecfb;
+  --pr: #7a4cc2; --pr-bg: #eee6fa;
+  --wait: #b26a00; --wait-bg: #fcefd9;
+  --ready: #0f7c80; --ready-bg: #dff3f3;
+  --block: #8a8985; --block-bg: #ecebe7;
+  --bad: #b3261e; --bad-bg: #fbe4e2;
+  --link: #1f5fbf;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161615; --card: #1f1f1d; --line: #33322f; --text: #ecebe7; --muted: #9c9b96; --soft: #2a2a27;
+    --ok: #6cc391; --ok-bg: #1d3326;
+    --run: #79a7ef; --run-bg: #1c2a42;
+    --pr: #b796ec; --pr-bg: #2c2340;
+    --wait: #e7a64a; --wait-bg: #3a2c16;
+    --ready: #5cc4c8; --ready-bg: #163334;
+    --block: #8f8e89; --block-bg: #2a2a27;
+    --bad: #ef8a83; --bad-bg: #3d1f1d;
+    --link: #8ab4f8;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+header { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line); padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+header h1 { font-size: 17px; margin: 0; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12.5px; white-space: nowrap; }
+.pill b { font-variant-numeric: tabular-nums; }
+.spacer { flex: 1; }
+.muted { color: var(--muted); }
+button { font: inherit; font-size: 12.5px; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button:hover { background: var(--soft); }
+main { padding: 16px 20px 60px; max-width: 1500px; margin: 0 auto; }
+.repo { margin-bottom: 34px; }
+.repo > h2 { font-size: 16px; margin: 0 0 4px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.repo > .sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.errore { background: var(--bad-bg); color: var(--bad); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; margin: 6px 0; }
+.piani { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr)); gap: 14px; margin-bottom: 14px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.card h3 { font-size: 14.5px; margin: 0 0 2px; }
+.card .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.barra { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--soft); margin: 10px 0 4px; gap: 2px; }
+.barra span { display: block; }
+.conta { font-size: 12px; color: var(--muted); margin-bottom: 8px; display: flex; gap: 10px; flex-wrap: wrap; }
+.task { display: grid; grid-template-columns: 128px 1fr; gap: 4px 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+.task .titolo { min-width: 0; }
+.task .titolo a.n { font-weight: 600; margin-right: 4px; }
+.task .det { grid-column: 2; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.task .sessioni { grid-column: 2; display: flex; flex-direction: column; gap: 6px; }
+.badge { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 5px; padding: 2px 7px; text-align: center; align-self: start; white-space: nowrap; }
+.s-fatto { color: var(--ok); background: var(--ok-bg); }
+.s-in_corso { color: var(--run); background: var(--run-bg); }
+.s-pr { color: var(--pr); background: var(--pr-bg); }
+.s-aspetta_te { color: var(--wait); background: var(--wait-bg); }
+.s-pronto { color: var(--ready); background: var(--ready-bg); }
+.s-bloccato { color: var(--block); background: var(--block-bg); }
+.s-permesso { color: var(--card); background: var(--wait); }
+.c-permesso { background: var(--wait); }
+.sess.permesso { border-left-color: var(--wait); background: var(--wait-bg); }
+.permesso .dot { background: var(--wait); animation: pulse 1s infinite; }
+.c-fatto { background: var(--ok); } .c-in_corso { background: var(--run); } .c-pr { background: var(--pr); }
+.c-aspetta_te { background: var(--wait); } .c-pronto { background: var(--ready); } .c-bloccato { background: var(--block); opacity: .5; }
+.sess { border: 1px solid var(--line); border-left: 3px solid var(--block); border-radius: 7px; padding: 6px 9px; background: var(--card); font-size: 12.5px; min-width: 0; }
+.sess.busy { border-left-color: var(--run); }
+.sess.idle { border-left-color: var(--wait); }
+.sess.chiudere { border-left-color: var(--block); opacity: .75; }
+.sess .riga1 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sess .orig { font-weight: 600; }
+.sess .att { color: var(--muted); margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.sess .att b { color: var(--text); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--block); flex: none; }
+.busy .dot { background: var(--run); animation: pulse 1.2s infinite; }
+.idle .dot { background: var(--wait); }
+@keyframes pulse { 50% { opacity: .3; } }
+.griglia-sess { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: 8px; }
+details { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+summary { cursor: pointer; padding: 9px 14px; font-weight: 600; font-size: 13px; }
+details > .corpo { padding: 0 14px 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+td { padding: 5px 6px; border-top: 1px solid var(--line); vertical-align: top; }
+td.n { white-space: nowrap; width: 1%; }
+.tag { display: inline-block; font-size: 11px; background: var(--soft); border-radius: 4px; padding: 0 6px; margin-right: 4px; color: var(--muted); }
+.tag.forte { background: var(--wait-bg); color: var(--wait); }
+.tag.male { background: var(--bad-bg); color: var(--bad); font-weight: 600; }
+.task.conflitto { box-shadow: inset 3px 0 0 var(--bad); }
+.conflitti { grid-column: 1 / -1; font-size: 12.5px; color: var(--bad); background: var(--bad-bg); border-radius: 6px; padding: 6px 10px; margin-top: 4px; }
+.conflitti div + div { margin-top: 3px; }
+.conflitti details { display: inline; } .conflitti summary { display: inline; padding: 0; font-weight: 400; font-size: inherit; cursor: pointer; color: var(--bad); text-decoration: underline dotted; }
+.conflitti .cf-file { display: block; margin: 3px 0 0 14px; color: var(--text); }
+.cmd { display: inline-flex; gap: 6px; align-items: center; }
+.cmd button { padding: 1px 7px; font-size: 11.5px; }
+.cmd button.primario { background: var(--ready); color: var(--card); border-color: var(--ready); font-weight: 600; }
+.cmd button:disabled { opacity: .6; cursor: default; }
+h4 { font-size: 13px; margin: 14px 0 8px; color: var(--muted); font-weight: 600; }
+.vuoto { color: var(--muted); font-size: 13px; padding: 30px 0; text-align: center; }
+/* pannello dettaglio task */
+#pannello[hidden], #velo[hidden], #chat[hidden] { display: none; }
+/* chat */
+#chat { position: fixed; top: 0; right: 0; bottom: 0; width: min(580px, 100vw); background: var(--bg); border-left: 1px solid var(--line); z-index: 4; display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0,0,0,.15); }
+@media (min-width: 1200px) { body.con-chat main, body.con-chat header { margin-right: 580px; } }
+#chat .testa { display: flex; gap: 6px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--card); flex-wrap: wrap; }
+#chat select { font: inherit; font-size: 12.5px; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; max-width: 100%; }
+#c-scelta { flex: 1; min-width: 0; }
+#c-info { font-size: 12px; color: var(--muted); padding: 6px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+#c-messaggi { flex: 1; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.m-utente { align-self: flex-end; background: var(--run-bg); border-radius: 10px 10px 2px 10px; padding: 7px 11px; max-width: 88%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.m-testo { overflow-wrap: anywhere; }
+.m-testo p { margin: 0 0 8px; } .m-testo p:last-child { margin-bottom: 0; }
+.m-testo ul, .m-testo ol { margin: 0 0 8px; padding-left: 20px; }
+.m-testo h1, .m-testo h2, .m-testo h3, .m-testo h4 { font-size: 13.5px; margin: 10px 0 4px; color: var(--text); }
+.m-testo pre, .p-pre { background: var(--soft); border-radius: 6px; padding: 8px 10px; overflow-x: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 4px 0 8px; white-space: pre; }
+.m-testo table { border-collapse: collapse; margin: 4px 0 8px; }
+.m-testo td:first-child { white-space: nowrap; } .m-testo td, .m-testo th { border: 1px solid var(--line); padding: 3px 6px; font-size: 12.5px; }
+.m-bozza { white-space: pre-wrap; color: var(--muted); overflow-wrap: anywhere; }
+.m-tool { font-size: 12px; color: var(--muted); border-left: 2px solid var(--line); padding-left: 8px; }
+.m-tool.sub { margin-left: 14px; }
+.m-tool summary { cursor: pointer; padding: 0; font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-tool b { color: var(--text); font-weight: 600; }
+.m-tool .ok { color: var(--ok); } .m-tool .ko { color: var(--bad); }
+.m-tool pre { white-space: pre-wrap; max-height: 260px; overflow: auto; background: var(--soft); border-radius: 6px; padding: 6px 8px; margin: 4px 0; font: 11.5px/1.4 ui-monospace, Menlo, monospace; }
+.m-sistema { font-size: 11.5px; color: var(--muted); text-align: center; }
+.m-fine { font-size: 11.5px; color: var(--muted); }
+.m-errore { background: var(--bad-bg); color: var(--bad); border-radius: 6px; padding: 6px 10px; font-size: 12.5px; white-space: pre-wrap; }
+.m-perm { border: 1px solid var(--wait); background: var(--wait-bg); border-radius: 9px; padding: 9px 11px; font-size: 12.5px; }
+.m-perm.chiusa { border-color: var(--line); background: var(--card); opacity: .75; }
+.m-perm .t { font-weight: 600; margin-bottom: 4px; }
+.m-perm .azioni { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+.m-perm .azioni input[type=text] { flex: 1; min-width: 120px; font: inherit; font-size: 12px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--text); }
+.m-perm .consenti { background: var(--ok); color: var(--card); border-color: var(--ok); font-weight: 600; }
+.m-perm .nega { color: var(--bad); }
+.m-perm .q { margin: 6px 0; } .m-perm .q label { display: block; padding: 2px 0; cursor: pointer; }
+.p-pre .add { color: var(--ok); } .p-pre .del { color: var(--bad); }
+#c-form { border-top: 1px solid var(--line); padding: 10px 12px; background: var(--card); display: flex; flex-direction: column; gap: 6px; }
+#c-testo { font: inherit; resize: vertical; min-height: 64px; max-height: 40vh; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--bg); color: var(--text); }
+#c-form .riga { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
+#c-form .riga .muted { flex: 1; font-size: 11.5px; }
+.inviare { background: var(--run); color: var(--card); border-color: var(--run); font-weight: 600; }
+.contatore { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--wait); color: var(--card); font-size: 11px; font-weight: 700; text-align: center; margin-left: 4px; }
+.puntino { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--block); }
+.puntino.lavora { background: var(--run); animation: pulse 1.2s infinite; } .puntino.permesso { background: var(--wait); animation: pulse 1.2s infinite; }
+.puntino.pronta { background: var(--ok); } .puntino.errore { background: var(--bad); }
+#velo { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 5; }
+#pannello { position: fixed; top: 0; right: 0; bottom: 0; width: min(1000px, 100vw); background: var(--bg); border-left: 1px solid var(--line); z-index: 6; display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0,0,0,.2); }
+#pannello .testa { display: flex; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--card); }
+#pannello .testa h2 { font-size: 15px; margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#p-corpo { overflow: auto; padding: 14px 16px 40px; flex: 1; }
+.riass { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.add { color: var(--ok); } .del { color: var(--bad); }
+.commit { font-size: 12.5px; margin: 0 0 10px; padding: 0; list-style: none; }
+.commit li { padding: 3px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; }
+.file { margin-top: 8px; }
+.file > summary { font-weight: 500; font-size: 12.5px; display: flex; gap: 10px; align-items: center; }
+.file > summary .nome { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; flex: 1; }
+.diff { margin: 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; border-top: 1px solid var(--line); }
+.diff div { display: grid; grid-template-columns: 44px 44px 1fr; white-space: pre; }
+.diff div > span:nth-child(-n+2) { color: var(--muted); text-align: right; padding-right: 8px; user-select: none; opacity: .7; }
+.diff .l-add { background: var(--ok-bg); } .diff .l-del { background: var(--bad-bg); }
+.diff .l-hunk { background: var(--soft); color: var(--muted); }
+.diff .l-hunk > span:last-child { color: var(--pr); }
+@media (max-width: 640px) {
+  header, main { padding-left: 16px; padding-right: 16px; }
+  .task { grid-template-columns: 1fr; }
+  .task .det, .task .sessioni { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Cruscotto agenti</h1>
+  <div class="stats" id="stats"></div>
+  <div class="spacer"></div>
+  <span class="muted" id="ora" style="font-size:12px"></span>
+  <button id="forza" title="Rilegge subito issue e PR da GitHub">Ricarica GitHub</button>
+  <button id="apri-chat">💬 Chat<span id="badge-chat"></span></button>
+</header>
+<main id="root"><div class="vuoto">Caricamento…</div></main>
+<aside id="chat" hidden>
+  <div class="testa">
+    <select id="c-scelta" title="Chat"></select>
+    <select id="c-repo" title="Repo della nuova chat"></select>
+    <button id="c-nuova">+ Nuova</button>
+    <button id="c-nascondi" title="Nascondi">✕</button>
+  </div>
+  <div id="c-info"></div>
+  <div id="c-messaggi"><div class="vuoto">Scegli o apri una chat.</div></div>
+  <form id="c-form">
+    <textarea id="c-testo" placeholder="Es. /pianifica … oppure &quot;metti #219 dopo #220&quot;. Invio per inviare, Maiusc+Invio a capo."></textarea>
+    <div class="riga"><span class="muted" id="c-nota"></span><button type="button" id="c-chiudi-sessione" title="Termina il processo Claude di questa chat (la storia resta)">Termina</button><button type="button" id="c-interrompi">Interrompi</button><button type="submit" class="inviare">Invia</button></div>
+  </form>
+</aside>
+<div id="velo" hidden></div>
+<aside id="pannello" hidden>
+  <div class="testa"><h2 id="p-titolo"></h2><span class="muted" id="p-ora" style="font-size:12px"></span><button id="p-aggiorna">Aggiorna</button><button id="p-chiudi" title="Chiudi (Esc)">✕</button></div>
+  <div id="p-corpo"></div>
+</aside>
+
+<script>
+const STATI = {
+  permesso:   'Chiede permesso',
+  in_corso:   'In corso',
+  aspetta_te: 'Aspetta te',
+  pr:         'PR da unire',
+  pronto:     'Pronto',
+  bloccato:   'Bloccato',
+  fatto:      'Fatto',
+};
+const ORDINE_STATI = ['fatto', 'pr', 'in_corso', 'permesso', 'aspetta_te', 'pronto', 'bloccato'];
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function fa(iso) {
+  if (!iso) return '';
+  const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return 'ora';
+  if (s < 3600) return `${Math.floor(s / 60)} min fa`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h fa`;
+  return `${Math.floor(s / 86400)} g fa`;
+}
+
+function link(url, testo, cls = '') {
+  return url ? `<a class="${cls}" href="${esc(url)}" target="_blank" rel="noopener">${esc(testo)}</a>` : esc(testo);
+}
+
+function comando(cmd) {
+  return `<span class="cmd"><code>${esc(cmd)}</code><button data-copia="${esc(cmd)}">copia</button></span>`;
+}
+
+function sessione(s, opz = {}) {
+  const st = s.stato === 'busy' ? 'busy' : s.stato === 'permesso' ? 'permesso' : 'idle';
+  const cls = opz.chiudere ? 'chiudere' : st;
+  const da = s.daQuando ? ' da ' + fa(s.daQuando).replace(' fa', '') : '';
+  const etichetta = st === 'busy' ? 'lavora' : st === 'permesso' ? `<b>chiede un permesso</b>${da}` : `ferma${da}`;
+  const a = s.attivita || {};
+  let att = '';
+  if (st === 'permesso' && (a.messaggio || a.azione)) {
+    att = a.azione ? `<b>${esc(a.azione.nome)}</b> ${esc(a.azione.testo)}` : esc(a.messaggio);
+  } else if (s.stato === 'busy' && a.azione) {
+    att = a.azione.tipo === 'tool' ? `<b>${esc(a.azione.nome)}</b> ${esc(a.azione.testo)}` : esc(a.azione.testo);
+  } else if (a.riepilogo) {
+    att = esc(a.riepilogo);
+  } else if (a.azione) {
+    att = a.azione.tipo === 'tool' ? `<b>${esc(a.azione.nome)}</b> ${esc(a.azione.testo)}` : esc(a.azione.testo);
+  }
+  const titolo = [
+    a.richiesta ? `Ultima richiesta: ${a.richiesta}` : '',
+    a.azione ? `Ultima azione: ${a.azione.tipo === 'tool' ? a.azione.nome + ' ' : ''}${a.azione.testo}` : '',
+    `cwd: ${s.cwd}`, `pid ${s.pid ?? '?'} · sessione ${s.sessionId} · v${s.versione || '?'}`,
+    s.fonte === 'hook' ? `stato dagli hook (macchina ${s.host})` : 'stato dal registro interno di Claude Code (sessione nata prima degli hook)',
+  ].filter(Boolean).join('\n\n');
+  return `<div class="sess ${cls}" title="${esc(titolo)}">
+    <div class="riga1"><span class="dot"></span><span class="orig">${esc(s.origine)}</span>
+      <span>${etichetta}</span>
+      ${s.locale === false ? `<span class="tag">${esc(s.host)}</span>` : ''}
+      ${s.branch ? `<code>${esc(s.branch)}</code>` : `<span class="muted">${esc(s.cartella)}</span>`}
+      ${s.chatCruscotto ? '<span class="tag forte">chat del cruscotto</span>' : ''}
+      ${opz.extra || ''}
+      <span class="spacer"></span><span class="muted">pid ${s.pid}</span></div>
+    ${att ? `<div class="att">${att}</div>` : ''}
+  </div>`;
+}
+
+// Riquadro con i conflitti di un task o di una sessione: cosa, rispetto a cosa, quali file.
+function elencoFile(file, id) {
+  if (!file?.length) return '';
+  const max = 30;
+  const righe = file.slice(0, max).map((f) => `<code>${esc(f)}</code>`).join('<br>') + (file.length > max ? `<br>… e altri ${file.length - max}` : '');
+  return ` <details data-id="cf:${esc(id)}"><summary>${file.length} file</summary><span class="cf-file">${righe}</span></details>`;
+}
+function riquadroConflitti(c, pr, chiave) {
+  if (!c) return '';
+  const r = [];
+  if (c.inCorso) {
+    const op = c.inCorso.operazione ? `${c.inCorso.operazione} a metà nel worktree` : 'file non risolti nel worktree';
+    r.push(`<div>⚠ <b>${op}</b>${c.inCorso.file.length ? ': da risolvere' + elencoFile(c.inCorso.file, chiave + ':op') : ''}</div>`);
+  }
+  if (c.github) r.push(`<div>⚠ <b>La PR${pr ? ' ' + link(pr.url, '#' + pr.numero) : ''} ha conflitti su GitHub</b>: va aggiornata con il branch di destinazione prima del merge</div>`);
+  if (c.conBase?.length) r.push(`<div>⚠ Il lavoro del worktree <b>andrebbe in conflitto con <code>${esc(c.base)}</code></b>${elencoFile(c.conBase, chiave + ':base')}</div>`);
+  for (const x of c.conTask || []) r.push(`<div>⚠ <b>Va in conflitto con #${x.numero}</b>: il secondo dei due che si unisce al piano avrà conflitti${elencoFile(x.file, chiave + ':' + x.numero)}</div>`);
+  return r.length ? `<div class="conflitti">${r.join('')}</div>` : '';
+}
+
+function piano(p, repo) {
+  const tot = p.task.length;
+  const segmenti = ORDINE_STATI.filter((k) => p.conta[k]).map((k) => `<span class="c-${k}" style="flex:${p.conta[k]}" title="${STATI[k]}: ${p.conta[k]}"></span>`).join('');
+  const conta = ORDINE_STATI.filter((k) => p.conta[k]).map((k) => `<span><span class="badge s-${k}">${p.conta[k]}</span> ${STATI[k].toLowerCase()}</span>`).join('');
+  const righe = p.task.map((t) => {
+    const det = [];
+    if (t.dipendenze.length) {
+      det.push('dopo ' + t.dipendenze.map((n) => {
+        const aperta = t.dipendenzeAperte.includes(n);
+        return `<span style="${aperta ? '' : 'text-decoration:line-through'}">#${n}</span>`;
+      }).join(', '));
+    }
+    if (t.pr) det.push(`PR ${link(t.pr.url, '#' + t.pr.numero)} ${t.pr.stato === 'MERGED' ? 'unita' : t.pr.stato === 'OPEN' ? 'aperta' : 'chiusa'}`);
+    if (t.worktree || t.pr) {
+      det.push(`<button data-diff="${t.numero}" data-repo="${esc(repo.radice)}" data-piano="${esc(p.branch)}" data-titolo="${esc(t.titolo)}">Vedi modifiche</button>`);
+    }
+    if (t.worktree && !t.sessioni.length && t.stato !== 'fatto') det.push(`worktree senza sessione: <code>${esc(t.worktree.percorso.split('/').pop())}</code>`);
+    if (repo.comandoAvvio && t.stato !== 'fatto' && !t.sessioni.length) {
+      const cmd = repo.comandoAvvio.replaceAll('{n}', t.numero);
+      const k = `${repo.radice}#${t.numero}`;
+      const bott = Date.now() - (avviate.get(k) || 0) < 60000
+        ? '<span class="tag forte">avviata, la sessione compare tra poco</span>'
+        : `<button class="avvia${t.stato === 'pronto' ? ' primario' : ''}" data-avvia="${t.numero}" data-repo="${esc(repo.radice)}" data-stato="${t.stato}" title="${esc(cmd)}">▶ Avvia sessione</button>`;
+      det.push(`<span class="cmd">${bott}<button data-copia="${esc(cmd)}" title="${esc(cmd)}">copia comando</button></span>`);
+    }
+    const chiudere = t.stato === 'fatto';
+    const sess = t.sessioni.map((s) => sessione(s, { chiudere, extra: chiudere ? '<span class="tag">da chiudere</span>' : '' })).join('');
+    return `<div class="task${t.conflitti ? ' conflitto' : ''}">
+      <span class="badge s-${t.stato}">${STATI[t.stato]}</span>
+      <div class="titolo">${link(t.url, '#' + t.numero, 'n')} ${esc(t.titolo)}${t.conflitti ? ' <span class="tag male">conflitto</span>' : ''}</div>
+      ${det.length ? `<div class="det">${det.join('<span>·</span>')}</div>` : ''}
+      ${riquadroConflitti(t.conflitti, t.pr, repo.radice + '#' + t.numero)}
+      ${sess ? `<div class="sessioni">${sess}</div>` : ''}
+    </div>`;
+  }).join('');
+  const sessPiano = p.sessioni.length ? `<h4>Sessioni sul branch del piano</h4><div class="sessioni">${p.sessioni.map((s) => sessione(s)).join('')}</div>` : '';
+  return `<div class="card">
+    <h3>${link(p.url, '#' + p.numero)} ${esc(p.titolo)}</h3>
+    <div class="meta"><code>${esc(p.branch)}</code> → <code>${esc(p.base)}</code>${p.bozza ? '<span class="tag">bozza</span>' : ''}<span>${p.conta.fatto || 0}/${tot} fatti</span>${p.conflitto ? `<span class="tag male" title="La PR del piano non si può unire in ${esc(p.base)} senza risolvere i conflitti">conflitto con ${esc(p.base)}</span>` : ''}${p.taskInConflitto ? `<span class="tag male">${p.taskInConflitto} task in conflitto</span>` : ''}</div>
+    <div class="barra">${segmenti}</div>
+    <div class="conta">${conta}</div>
+    ${righe || '<div class="muted">Nessun task in checklist.</div>'}
+    ${sessPiano}
+  </div>`;
+}
+
+function blocchiRepo(r) {
+  const attive = r.altreSessioni.filter((s) => !s.daChiudere);
+  const chiudere = r.altreSessioni.filter((s) => s.daChiudere);
+  const tagSess = (s) => {
+    const t = [];
+    if (s.issueInfo) t.push(`${link(s.issueInfo.url, '#' + s.issueInfo.numero)} ${s.issueInfo.stato === 'chiusa' ? '<span class="tag">chiusa</span>' : ''}`);
+    if (s.pr) t.push(`PR ${link(s.pr.url, '#' + s.pr.numero)}${s.pr.stato !== 'OPEN' ? ` <span class="tag">${s.pr.stato === 'MERGED' ? 'unita' : 'chiusa'}</span>` : ''}`);
+    if (s.conflitti) t.push(`<span class="tag male">conflitto</span>${riquadroConflitti(s.conflitti, s.pr, s.sessionId)}`);
+    return t.join(' ');
+  };
+  let html = '';
+  if (attive.length) {
+    html += `<h4>Sessioni fuori dai piani (${attive.length})</h4><div class="griglia-sess">${attive.map((s) => sessione(s, { extra: tagSess(s) })).join('')}</div>`;
+  }
+  if (chiudere.length) {
+    html += `<details data-id="${esc(r.radice)}:chiudere"><summary>Sessioni da chiudere (${chiudere.length}) <span class="muted" style="font-weight:400">issue chiusa o PR già unita, processo ancora aperto</span></summary><div class="corpo griglia-sess">${chiudere.map((s) => sessione(s, { chiudere: true, extra: tagSess(s) })).join('')}</div></details>`;
+  }
+  if (r.prFuoriPiano.length) {
+    html += `<details data-id="${esc(r.radice)}:pr"><summary>PR aperte fuori dai piani (${r.prFuoriPiano.length})</summary><div class="corpo"><table>${r.prFuoriPiano.map((p) => `<tr><td class="n">${link(p.url, '#' + p.numero)}</td><td>${esc(p.titolo)} ${p.bozza ? '<span class="tag">bozza</span>' : ''}${p.conflitto ? '<span class="tag male">conflitto</span>' : ''}</td><td class="n"><code>${esc(p.branch)}</code> → <code>${esc(p.base)}</code></td></tr>`).join('')}</table></div></details>`;
+  }
+  if (r.issueFuoriPiano.length) {
+    html += `<details data-id="${esc(r.radice)}:issue"><summary>Issue aperte fuori dai piani (${r.issueFuoriPiano.length})</summary><div class="corpo"><table>${r.issueFuoriPiano.map((i) => `<tr><td class="n">${link(i.url, '#' + i.numero)}</td><td>${esc(i.titolo)} ${i.sessioni.length ? '<span class="tag forte">sessione aperta</span>' : ''}</td><td class="n">${i.etichette.map((e) => `<span class="tag">${esc(e)}</span>`).join('')}</td><td class="n muted">${fa(i.aggiornata)}</td></tr>`).join('')}</table></div></details>`;
+  }
+  return html;
+}
+
+function render(d) {
+  const t = d.totali;
+  const origini = Object.entries(t.perOrigine).map(([k, v]) => `${esc(k)} ${v}`).join(' · ');
+  document.getElementById('stats').innerHTML = `
+    <span class="pill"><b>${t.sessioni}</b> sessioni vive${origini ? ` <span class="muted">(${origini})</span>` : ''}</span>
+    <span class="pill" style="color:var(--run)"><b>${t.lavorano}</b> lavorano</span>
+    ${t.permessi ? `<span class="pill" style="color:var(--card);background:var(--wait);border-color:var(--wait)"><b>${t.permessi}</b> chiedono un permesso</span>` : ''}
+    <span class="pill" style="color:var(--wait)"><b>${t.ferme}</b> ferme</span>
+    <span class="pill muted" title="Sessioni il cui stato arriva dagli hook; le altre sono lette dal registro interno">hook ${t.daHook}/${t.sessioni}</span>
+    ${t.conflitti ? `<span class="pill" style="color:var(--bad);background:var(--bad-bg);border-color:var(--bad)" title="${esc((d.conflitti || []).map((c) => `${c.repo} #${c.numero ?? ''} ${c.titolo}`).join('\n'))}"><b>${t.conflitti}</b> in conflitto</span>` : ''}
+    ${t.daChiudere ? `<span class="pill muted"><b>${t.daChiudere}</b> da chiudere</span>` : ''}`;
+
+  let html = d.errori.map((e) => `<div class="errore">${esc(e)}</div>`).join('');
+  for (const r of d.repos) {
+    html += `<section class="repo">
+      <h2>${esc(r.nome)} ${r.githubUrl ? link(r.githubUrl, r.github) : '<span class="muted" style="font-size:12px;font-weight:400">nessun remote GitHub</span>'} <button data-chat-repo="${esc(r.radice)}" title="Apre una chat Claude nella radice di questo repo">💬 Nuova chat qui</button></h2>
+      <div class="sub">${esc(r.radice)}${r.letto ? ` · GitHub letto ${fa(r.letto)}` : ''}</div>
+      ${r.errore ? `<div class="errore">GitHub: ${esc(r.errore)}</div>` : ''}
+      ${r.piani.length ? `<div class="piani">${r.piani.map((p) => piano(p, r)).join('')}</div>` : (r.github ? '<div class="muted" style="font-size:13px">Nessun piano aperto.</div>' : '')}
+      ${blocchiRepo(r)}
+    </section>`;
+  }
+  if (d.fuoriRepo.length) {
+    html += `<section class="repo"><h2>Fuori da un repo git</h2><div class="griglia-sess">${d.fuoriRepo.map((s) => sessione(s, { extra: `<span class="muted">${esc(s.cwd.replace(/^\/Users\/[^/]+/, '~'))}</span>` })).join('')}</div></section>`;
+  }
+  if (!d.repos.length && !d.fuoriRepo.length) html += '<div class="vuoto">Nessuna sessione Claude Code viva.</div>';
+
+  const aperti = new Set([...document.querySelectorAll('details[open]')].map((x) => x.dataset.id));
+  const root = document.getElementById('root');
+  root.innerHTML = html;
+  root.querySelectorAll('details').forEach((x) => { if (aperti.has(x.dataset.id)) x.open = true; });
+  document.getElementById('ora').textContent = 'aggiornato ' + new Date(d.generato).toLocaleTimeString('it-IT');
+  aggiornaRepoChat(d.repos);
+}
+
+let ultimo = '';
+let disegnato = 0;
+const avviate = new Map(); // "repo#n" -> quando, per non lanciare due volte mentre la sessione si registra
+
+async function avvia(b) {
+  const n = Number(b.dataset.avvia);
+  if (b.dataset.stato === 'bloccato' && !confirm(`#${n} ha dipendenze non ancora unite. Avvio lo stesso?`)) return;
+  b.disabled = true; b.textContent = 'avvio…';
+  try {
+    const r = await fetch('/api/avvia', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-cruscotto': '1' },
+      body: JSON.stringify({ repo: b.dataset.repo, numero: n }),
+    });
+    const d = await r.json().catch(() => ({ errore: `HTTP ${r.status}` }));
+    if (!r.ok) throw new Error(d.errore || `HTTP ${r.status}`);
+    avviate.set(`${b.dataset.repo}#${n}`, Date.now());
+    b.textContent = 'avviata ✓';
+  } catch (e) {
+    alert(`Avvio di #${n} non riuscito: ${e.message}`);
+    b.disabled = false; b.textContent = '▶ Avvia sessione';
+  }
+}
+async function aggiorna(forza = false) {
+  try {
+    const r = await fetch('/api/stato' + (forza ? '?forza=1' : ''), { cache: 'no-store' });
+    const testo = await r.text();
+    const d = JSON.parse(testo);
+    if (d.errore) throw new Error(d.errore);
+    const firma = testo.replace(/"generato":"[^"]*"/, '');
+    // ri-disegna anche a dati fermi ogni 30 s, per i tempi relativi ("ferma da 5 min")
+    if (firma !== ultimo || forza || Date.now() - disegnato > 30000) { ultimo = firma; disegnato = Date.now(); render(d); }
+    else document.getElementById('ora').textContent = 'aggiornato ' + new Date(d.generato).toLocaleTimeString('it-IT');
+  } catch (e) {
+    document.getElementById('ora').textContent = 'errore: ' + e.message;
+  }
+}
+
+// ---------------------------------------------------------------- pannello modifiche
+
+let aperto = null;       // { repo, numero, piano, titolo }
+let firmaDiff = '';
+const fileChiusi = new Set();
+const fileAperti = new Set();
+
+function fileDaPatch(patch) {
+  const out = [];
+  for (const pezzo of patch.split(/^diff --git /m)) {
+    if (!pezzo.trim()) continue;
+    const righe = pezzo.split('\n');
+    const m = righe[0].match(/^a\/(.+?) b\/(.+)$/);
+    const nome = m ? (m[1] === m[2] ? m[2] : `${m[1]} → ${m[2]}`) : righe[0];
+    let add = 0, del = 0;
+    const inizio = righe.findIndex((r) => r.startsWith('@@'));
+    const corpo = inizio >= 0 ? righe.slice(inizio) : [];
+    for (const r of corpo) {
+      if (r.startsWith('+')) add++;
+      else if (r.startsWith('-')) del++;
+    }
+    const intest = (inizio >= 0 ? righe.slice(1, inizio) : righe.slice(1)).join('\n');
+    const tipo = /^new file/m.test(intest) ? 'nuovo' : /^deleted file/m.test(intest) ? 'eliminato' : /^rename from/m.test(intest) ? 'rinominato' : '';
+    out.push({ nome, add, del, corpo, binario: /^Binary files/m.test(intest), tipo });
+  }
+  return out;
+}
+
+function righeDiff(corpo) {
+  let vecchia = 0, nuova = 0;
+  const html = [];
+  for (const r of corpo) {
+    if (r === '' ) continue;
+    if (r.startsWith('@@')) {
+      const m = r.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)/);
+      if (m) { vecchia = +m[1]; nuova = +m[2]; }
+      html.push(`<div class="l-hunk"><span></span><span></span><span>${esc(r)}</span></div>`);
+    } else if (r.startsWith('+')) {
+      html.push(`<div class="l-add"><span></span><span>${nuova++}</span><span>${esc(r)}</span></div>`);
+    } else if (r.startsWith('-')) {
+      html.push(`<div class="l-del"><span>${vecchia++}</span><span></span><span>${esc(r)}</span></div>`);
+    } else if (r.startsWith('\\')) {
+      html.push(`<div><span></span><span></span><span class="muted">${esc(r)}</span></div>`);
+    } else {
+      html.push(`<div><span>${vecchia++}</span><span>${nuova++}</span><span>${esc(r)}</span></div>`);
+    }
+  }
+  return html.join('');
+}
+
+function renderDiff(d) {
+  const sezioni = d.sezioni.map((s) => ({ ...s, file: fileDaPatch(s.patch) }));
+  const tutti = sezioni.flatMap((s) => s.file);
+  const add = tutti.reduce((n, f) => n + f.add, 0), del = tutti.reduce((n, f) => n + f.del, 0);
+  const pochi = tutti.length <= 12;
+
+  let h = `<div class="riass">
+    <span><code>${esc(d.branch || '?')}</code> → <code>${esc(d.base || '?')}</code></span>
+    ${d.fonte === 'worktree' ? `<span>worktree <code>${esc(d.percorso.replace(/^\/Users\/[^/]+/, '~'))}</code></span>` : `<span>dalla ${link(d.pr.url, 'PR #' + d.pr.numero)} (${d.pr.stato === 'MERGED' ? 'unita' : d.pr.stato === 'OPEN' ? 'aperta' : 'chiusa'}): il worktree non c'è più</span>`}
+    <span>${tutti.length} file · <span class="add">+${add}</span> <span class="del">−${del}</span></span>
+  </div>`;
+
+  if (d.commit.length) {
+    h += `<h4>Commit (${d.commit.length})</h4><ul class="commit">${d.commit.map((c) => `<li><code>${esc(c.hash)}</code><span style="flex:1">${esc(c.titolo)}</span><span class="muted">${fa(c.data)}</span></li>`).join('')}</ul>`;
+  }
+  for (const s of sezioni) {
+    if (!s.file.length) {
+      if (s.chiave === 'locali') h += `<h4>${esc(s.titolo)}</h4><div class="muted" style="font-size:12.5px">Nessuna.</div>`;
+      continue;
+    }
+    const sa = s.file.reduce((n, f) => n + f.add, 0), sd = s.file.reduce((n, f) => n + f.del, 0);
+    h += `<h4>${esc(s.titolo)} · ${s.file.length} file <span class="add">+${sa}</span> <span class="del">−${sd}</span></h4>`;
+    if (s.troncato) h += '<div class="errore">Diff troppo grande: mostrata solo la prima parte.</div>';
+    for (const f of s.file) {
+      const id = `${s.chiave}:${f.nome}`;
+      const apri = fileAperti.has(id) || (!fileChiusi.has(id) && pochi && f.add + f.del <= 400);
+      h += `<details class="file" data-file="${esc(id)}" ${apri ? 'open' : ''}>
+        <summary><span class="nome">${esc(f.nome)}</span>${f.tipo ? `<span class="tag">${f.tipo}</span>` : ''}<span class="add">+${f.add}</span><span class="del">−${f.del}</span></summary>
+        ${f.binario ? '<div class="corpo muted">File binario.</div>' : `<div class="diff">${righeDiff(f.corpo)}</div>`}
+      </details>`;
+    }
+  }
+  if (d.nonTracciati.length) {
+    h += `<h4>File nuovi non ancora aggiunti a git (${d.nonTracciati.length})</h4><ul class="commit">${d.nonTracciati.map((f) => `<li><code>${esc(f)}</code></li>`).join('')}</ul>`;
+  }
+  if (!tutti.length && !d.nonTracciati.length && !d.commit.length) h += '<div class="vuoto">Nessuna modifica rispetto alla base.</div>';
+  return h;
+}
+
+async function caricaDiff(forza = false) {
+  if (!aperto) return;
+  const q = new URLSearchParams({ repo: aperto.repo, numero: aperto.numero, piano: aperto.piano || '' });
+  const corpo = document.getElementById('p-corpo');
+  try {
+    const r = await fetch('/api/diff?' + q, { cache: 'no-store' });
+    const testo = await r.text();
+    const d = JSON.parse(testo);
+    if (!r.ok) throw new Error(d.errore || `HTTP ${r.status}`);
+    const firma = testo.replace(/"letto":"[^"]*"/, '');
+    if (firma !== firmaDiff || forza) { firmaDiff = firma; corpo.innerHTML = renderDiff(d); }
+    document.getElementById('p-ora').textContent = 'letto ' + new Date(d.letto).toLocaleTimeString('it-IT');
+  } catch (e) {
+    corpo.innerHTML = `<div class="errore">${esc(e.message)}</div>`;
+  }
+}
+
+function apriDiff(b) {
+  aperto = { repo: b.dataset.repo, numero: b.dataset.diff, piano: b.dataset.piano, titolo: b.dataset.titolo };
+  firmaDiff = ''; fileChiusi.clear(); fileAperti.clear();
+  document.getElementById('p-titolo').textContent = `#${aperto.numero} ${aperto.titolo}`;
+  document.getElementById('p-corpo').innerHTML = '<div class="vuoto">Leggo le modifiche…</div>';
+  document.getElementById('pannello').hidden = false;
+  document.getElementById('velo').hidden = false;
+  caricaDiff();
+}
+
+function chiudiDiff() {
+  aperto = null;
+  document.getElementById('pannello').hidden = true;
+  document.getElementById('velo').hidden = true;
+}
+
+document.getElementById('p-chiudi').addEventListener('click', chiudiDiff);
+document.getElementById('velo').addEventListener('click', chiudiDiff);
+document.getElementById('p-aggiorna').addEventListener('click', () => caricaDiff(true));
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && aperto) chiudiDiff(); });
+// ricorda i file aperti/chiusi a mano tra un aggiornamento e l'altro
+document.getElementById('p-corpo').addEventListener('toggle', (e) => {
+  const id = e.target.dataset?.file;
+  if (!id) return;
+  if (e.target.open) { fileAperti.add(id); fileChiusi.delete(id); } else { fileChiusi.add(id); fileAperti.delete(id); }
+}, true);
+// mentre il pannello è aperto, rilegge il worktree ogni 10 s (la sessione può star scrivendo)
+setInterval(() => { if (aperto) caricaDiff(); }, 10000);
+
+document.addEventListener('click', async (e) => {
+  const dd = e.target.closest('[data-diff]');
+  if (dd) { apriDiff(dd); return; }
+  const a = e.target.closest('[data-avvia]');
+  if (a) { avvia(a); return; }
+  const b = e.target.closest('[data-copia]');
+  if (b) { await navigator.clipboard.writeText(b.dataset.copia).catch(() => {}); b.textContent = 'copiato'; setTimeout(() => (b.textContent = 'copia'), 1200); }
+});
+document.getElementById('forza').addEventListener('click', async (e) => {
+  e.target.disabled = true; await aggiorna(true); e.target.disabled = false;
+});
+// ---------------------------------------------------------------- chat
+
+async function post(url, corpo) {
+  const r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-cruscotto': '1' }, body: JSON.stringify(corpo || {}) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.errore || `HTTP ${r.status}`);
+  return d;
+}
+
+function md(testo) {
+  const parti = String(testo).split(/```[^\n]*\n?/);
+  return parti.map((p, i) => {
+    if (i % 2) return `<pre>${esc(p.replace(/\n$/, ''))}</pre>`;
+    const inline = (s) => esc(s)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+      .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+    const out = [];
+    let lista = null, par = [];
+    const chiudiPar = () => { if (par.length) { out.push(`<p>${par.map(inline).join('<br>')}</p>`); par = []; } };
+    const chiudiLista = () => { if (lista) { out.push(`<${lista.tipo}>${lista.voci.map((v) => `<li>${inline(v)}</li>`).join('')}</${lista.tipo}>`); lista = null; } };
+    const righe = p.split('\n');
+    for (let k = 0; k < righe.length; k++) {
+      const r = righe[k];
+      const titolo = r.match(/^(#{1,4})\s+(.*)$/);
+      const voce = r.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/);
+      if (/^\s*\|.*\|\s*$/.test(r)) {
+        chiudiPar(); chiudiLista();
+        const tab = [];
+        while (k < righe.length && /^\s*\|.*\|\s*$/.test(righe[k])) { tab.push(righe[k]); k++; }
+        k--;
+        const celle = (x) => x.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+        const corpo = tab.filter((x) => !/^\s*\|[\s:|-]+\|\s*$/.test(x));
+        out.push(`<table>${corpo.map((x, j) => `<tr>${celle(x).map((c) => j ? `<td>${inline(c)}</td>` : `<th>${inline(c)}</th>`).join('')}</tr>`).join('')}</table>`);
+      } else if (titolo) { chiudiPar(); chiudiLista(); out.push(`<h4>${inline(titolo[2])}</h4>`); }
+      else if (voce) {
+        chiudiPar();
+        const tipo = voce[1] ? 'ol' : 'ul';
+        if (!lista || lista.tipo !== tipo) { chiudiLista(); lista = { tipo, voci: [] }; }
+        lista.voci.push(voce[2]);
+      } else if (!r.trim()) { chiudiPar(); chiudiLista(); }
+      else if (lista && /^\s{2,}/.test(r)) lista.voci[lista.voci.length - 1] += ' ' + r.trim();
+      else { chiudiLista(); par.push(r); }
+    }
+    chiudiPar(); chiudiLista();
+    return out.join('');
+  }).join('');
+}
+
+const kTok = (n) => n >= 1e6 ? (n / 1e6).toFixed(1) + ' M' : n >= 1000 ? (n / 1000).toFixed(1) + ' k' : String(n || 0);
+
+function testoToken(t) {
+  if (!t?.turno) return '';
+  const u = t.turno, z = t.totale;
+  const dettaglio = [
+    'Questo turno:',
+    `  input nuovo ${u.input} · letto dalla cache ${u.cacheLettura} · scritto in cache ${u.cacheScrittura}`,
+    `  output ${u.output}${u.thinking ? ` (di cui ragionamento ${u.thinking})` : ''}`,
+    'Totale della chat:',
+    `  input ${z.input} · cache letta ${z.cacheLettura} · cache scritta ${z.cacheScrittura} · output ${z.output}`,
+    ...Object.entries(z.modelli || {}).map(([m, x]) => `  ${m}: in ${x.input} · cache ${x.cacheLettura}+${x.cacheScrittura} · out ${x.output}`),
+  ].join('\n');
+  return ` · <span title="${esc(dettaglio)}">↑ ${kTok(u.input + u.cacheLettura + u.cacheScrittura)} token (cache ${kTok(u.cacheLettura)}) · ↓ ${kTok(u.output)}</span>`;
+}
+
+const NOMI_LIMITI = { five_hour: '5 h', seven_day: '7 giorni', seven_day_opus: '7 g Opus', seven_day_sonnet: '7 g Sonnet', overage: 'extra' };
+
+function testoLimiti(limiti) {
+  const voci = Object.entries(limiti || {}).filter(([, l]) => l.utilization != null || l.status !== 'allowed');
+  if (!voci.length) return '';
+  return voci.map(([k, l]) => {
+    const pct = l.utilization == null ? null : Math.round(l.utilization <= 1 ? l.utilization * 100 : l.utilization);
+    const reset = l.resetsAt ? new Date(l.resetsAt * (l.resetsAt < 1e12 ? 1000 : 1)).toLocaleString('it-IT', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    const stato = l.status === 'rejected' ? ' ⛔' : l.status === 'allowed_warning' ? ' ⚠' : '';
+    return `<span title="Limite dell'abbonamento ${esc(NOMI_LIMITI[k] || k)}${reset ? ', si azzera ' + esc(reset) : ''}">${esc(NOMI_LIMITI[k] || k)}${pct != null ? ` ${pct}%` : ''}${stato}</span>`;
+  }).join(' · ');
+}
+
+const chatUI = { attiva: null, fonte: null, ultimoSeq: 0, pendenti: new Set(), bozza: null, tool: new Map(), stato: null, elenco: [] };
+const $ = (id) => document.getElementById(id);
+
+function inFondo() { const m = $('c-messaggi'); return m.scrollHeight - m.scrollTop - m.clientHeight < 80; }
+function scorri(eraInFondo) { if (eraInFondo) { const m = $('c-messaggi'); m.scrollTop = m.scrollHeight; } }
+
+function aggiungi(html) {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const el = div.firstElementChild;
+  $('c-messaggi').appendChild(el);
+  return el;
+}
+
+function anteprimaPermesso(e) {
+  const i = e.input || {};
+  if (e.nome === 'Bash') return `<pre class="p-pre">${esc(i.command || '')}</pre>${i.description ? `<div class="muted">${esc(i.description)}</div>` : ''}`;
+  if (e.nome === 'Edit') {
+    const righe = [...String(i.old_string || '').split('\n').map((r) => `<span class="del">- ${esc(r)}</span>`), ...String(i.new_string || '').split('\n').map((r) => `<span class="add">+ ${esc(r)}</span>`)];
+    return `<div><code>${esc(i.file_path)}</code>${i.replace_all ? ' <span class="tag">tutte le occorrenze</span>' : ''}</div><pre class="p-pre">${righe.slice(0, 120).join('\n')}</pre>`;
+  }
+  if (e.nome === 'Write') {
+    const righe = String(i.content || '').split('\n');
+    return `<div><code>${esc(i.file_path)}</code> · ${righe.length} righe</div><pre class="p-pre">${esc(righe.slice(0, 40).join('\n'))}${righe.length > 40 ? '\n…' : ''}</pre>`;
+  }
+  return `<pre class="p-pre">${esc(JSON.stringify(i, null, 2).slice(0, 4000))}</pre>`;
+}
+
+function cartaDomanda(e) {
+  const qs = (e.input?.questions || []);
+  return qs.map((q, n) => `<div class="q" data-domanda="${esc(q.question)}" data-multi="${q.multiSelect ? 1 : 0}">
+    <div><b>${esc(q.question)}</b></div>
+    ${(q.options || []).map((o) => `<label><input type="${q.multiSelect ? 'checkbox' : 'radio'}" name="q-${esc(e.id)}-${n}" value="${esc(o.label)}"> ${esc(o.label)}${o.description ? ` <span class="muted">— ${esc(o.description)}</span>` : ''}</label>`).join('')}
+    <label><input type="${q.multiSelect ? 'checkbox' : 'radio'}" name="q-${esc(e.id)}-${n}" value="__altro"> Altro: <input type="text" class="altro" style="width:60%"></label>
+  </div>`).join('');
+}
+
+function cartaPermesso(e) {
+  const intest = e.domanda ? 'Claude ti fa una domanda' : `Claude chiede il permesso: <code>${esc(e.nome)}</code>`;
+  return `<div class="m-perm" data-perm="${esc(e.id)}">
+    <div class="t">${intest}</div>
+    ${e.motivo ? `<div class="muted">${esc(e.motivo)}</div>` : ''}
+    ${e.mcp ? `<div class="muted">server MCP: ${esc(e.mcp)}</div>` : ''}
+    ${e.percorso ? `<div class="muted">percorso: <code>${esc(e.percorso)}</code></div>` : ''}
+    ${e.domanda ? cartaDomanda(e) : anteprimaPermesso(e)}
+    <div class="azioni">${e.domanda
+      ? '<button class="consenti" data-decidi="risposta">Rispondi</button><button class="nega" data-decidi="nega">Non rispondere</button>'
+      : `<button class="consenti" data-decidi="consenti">Consenti</button>${e.puoiSempre ? '<button data-decidi="consenti_sempre" title="Non chiederlo più in questa chat per questo tipo di azione">Consenti sempre</button>' : ''}<input type="text" placeholder="motivo (facoltativo)" class="motivo"><button class="nega" data-decidi="nega">Nega</button>`}</div>
+  </div>`;
+}
+
+function chiudiCarta(el, testo) {
+  el.classList.add('chiusa');
+  const az = el.querySelector('.azioni');
+  if (az) az.innerHTML = `<span class="muted">${esc(testo)}</span>`;
+}
+
+function aggiornaInfo() {
+  const c = chatUI.elenco.find((x) => x.id === chatUI.attiva);
+  const st = chatUI.stato || c?.stato || '';
+  const nomi = { lavora: 'lavora', permesso: 'aspetta un tuo permesso', pronta: 'pronta', chiusa: 'chiusa (al prossimo messaggio riprende)', errore: 'errore' };
+  const lim = testoLimiti(chatUI.limiti);
+  $('c-info').innerHTML = (c ? `<span class="puntino ${esc(st)}"></span> ${esc(nomi[st] || st)} · <span>${esc(c.repo.split('/').pop())}</span>${c.sessionId ? ` · <code>${esc(c.sessionId.slice(0, 8))}</code>` : ''}` : '')
+    + (lim ? `<span style="margin-left:auto">limiti: ${lim}</span>` : '');
+  const occupata = st === 'lavora' || st === 'permesso';
+  $('c-interrompi').hidden = !occupata;
+  $('c-chiudi-sessione').hidden = !(occupata || st === 'pronta');
+  $('c-nota').textContent = occupata ? 'Puoi scrivere anche mentre lavora: il messaggio va in coda.' : '';
+}
+
+function evento(e) {
+  const fondo = inFondo();
+  if (e.seq && !e.replay && e.tipo !== 'delta') chatUI.ultimoSeq = Math.max(chatUI.ultimoSeq, e.seq);
+  if (e.tipo !== 'delta' && e.tipo !== 'stato' && chatUI.bozza && (e.tipo === 'testo' || e.tipo === 'tool' || e.tipo === 'fine' || e.tipo === 'errore')) { chatUI.bozza.remove(); chatUI.bozza = null; }
+  switch (e.tipo) {
+    case 'utente': aggiungi(`<div class="m-utente">${esc(e.testo)}</div>`); break;
+    case 'delta':
+      if (!chatUI.bozza) chatUI.bozza = aggiungi('<div class="m-bozza"></div>');
+      chatUI.bozza.textContent += e.testo;
+      break;
+    case 'testo': aggiungi(`<div class="m-testo">${md(e.testo)}</div>`); break;
+    case 'tool': {
+      const el = aggiungi(`<details class="m-tool${e.sub ? ' sub' : ''}"><summary><span class="esito">…</span> <b>${esc(e.nome)}</b> ${esc(e.riassunto)}</summary></details>`);
+      chatUI.tool.set(e.id, el);
+      break;
+    }
+    case 'esito': {
+      const el = chatUI.tool.get(e.id);
+      if (el) {
+        el.querySelector('.esito').outerHTML = e.errore ? '<span class="ko">✗</span>' : '<span class="ok">✓</span>';
+        if (e.testo) el.insertAdjacentHTML('beforeend', `<pre>${esc(e.testo)}</pre>`);
+      }
+      break;
+    }
+    case 'permesso': aggiungi(cartaPermesso(e)); chatUI.pendenti.add(e.id); break;
+    case 'permesso_risolto': {
+      chatUI.pendenti.delete(e.id);
+      const el = document.querySelector(`[data-perm="${CSS.escape(e.id)}"]`);
+      if (el) chiudiCarta(el, e.decisione === 'consentito' ? '✓ consentito' : '✗ negato');
+      break;
+    }
+    case 'fine':
+      aggiungi(`<div class="m-fine">${e.errore ? `⚠️ finito con errore (${esc(e.sottotipo)})` : '✓ fatto'} · ${Math.round((e.durata || 0) / 1000)} s${testoToken(e.token)}${e.costo ? ` · <span title="Calcolata da Claude Code: token usati × listino API. ${e.abbonamento ? 'Con il login dell\'abbonamento non è una spesa: consuma la quota del piano.' : 'Con una API key è la spesa stimata, non la fattura.'}">${e.abbonamento ? 'abbonamento · ' : ''}stima a prezzi API ~$${e.costo.toFixed(2)}</span>` : ''}</div>`);
+      break;
+    case 'sistema': aggiungi(`<div class="m-sistema">${esc(e.testo)}</div>`); break;
+    case 'errore': aggiungi(`<div class="m-errore">${esc(e.testo)}</div>`); break;
+    case 'stato':
+      chatUI.stato = e.stato;
+      if (e.pendenti) {
+        chatUI.pendenti = new Set(e.pendenti);
+        document.querySelectorAll('#c-messaggi [data-perm]').forEach((el) => {
+          if (!chatUI.pendenti.has(el.dataset.perm) && !el.classList.contains('chiusa')) chiudiCarta(el, 'richiesta non più attiva');
+        });
+      }
+      aggiornaInfo();
+      break;
+  }
+  scorri(fondo || e.tipo === 'utente' || e.tipo === 'permesso');
+}
+
+function collega(id, da = 0) {
+  chatUI.fonte?.close();
+  const f = new EventSource(`/api/chat/${encodeURIComponent(id)}/eventi?da=${da}`);
+  chatUI.fonte = f;
+  f.onmessage = (m) => { if (chatUI.attiva === id) evento(JSON.parse(m.data)); };
+  f.onerror = () => {
+    f.close();
+    if (chatUI.fonte === f) setTimeout(() => { if (chatUI.attiva === id && chatUI.fonte === f) collega(id, chatUI.ultimoSeq); }, 2000);
+  };
+}
+
+function apriChat(id) {
+  chatUI.attiva = id;
+  chatUI.ultimoSeq = 0; chatUI.pendenti = new Set(); chatUI.bozza = null; chatUI.tool = new Map(); chatUI.stato = null;
+  try { localStorage.setItem('chat-attiva', id || ''); } catch {}
+  $('c-messaggi').innerHTML = id ? '' : '<div class="vuoto">Scegli o apri una chat.</div>';
+  if ($('c-scelta').value !== id) $('c-scelta').value = id || '';
+  aggiornaInfo();
+  if (id) collega(id); else chatUI.fonte?.close();
+}
+
+function mostraChat(si) {
+  $('chat').hidden = !si;
+  document.body.classList.toggle('con-chat', si);
+  try { localStorage.setItem('chat-aperta', si ? '1' : ''); } catch {}
+  if (si) setTimeout(() => $('c-testo').focus(), 50);
+}
+
+async function aggiornaElencoChat() {
+  try {
+    chatUI.elenco = await (await fetch('/api/chat', { cache: 'no-store' })).json();
+    chatUI.limiti = await (await fetch('/api/chat/limiti', { cache: 'no-store' })).json();
+  } catch { return; }
+  const sel = $('c-scelta');
+  const opz = chatUI.elenco.map((c) => `<option value="${esc(c.id)}">${c.permessiInAttesa ? '⚠ ' : c.stato === 'lavora' ? '● ' : ''}${esc(c.titolo)} · ${esc(c.repo.split('/').pop())}</option>`).join('');
+  const html = `<option value="">— chat —</option>${opz}`;
+  if (sel.dataset.html !== html) { sel.innerHTML = html; sel.dataset.html = html; sel.value = chatUI.attiva || ''; }
+  const attesa = chatUI.elenco.reduce((n, c) => n + c.permessiInAttesa, 0);
+  $('badge-chat').innerHTML = attesa ? `<span class="contatore" title="Permessi in attesa">${attesa}</span>` : '';
+  document.title = (attesa ? `(${attesa}) ` : '') + 'Cruscotto agenti';
+  aggiornaInfo();
+}
+
+function aggiornaRepoChat(repos) {
+  const sel = $('c-repo');
+  const html = repos.map((r) => `<option value="${esc(r.radice)}">${esc(r.nome)}</option>`).join('');
+  if (sel.dataset.html !== html) { const v = sel.value; sel.innerHTML = html; sel.dataset.html = html; if (v) sel.value = v; }
+}
+
+async function nuovaChat(repo) {
+  try {
+    const { id } = await post('/api/chat', { repo });
+    await aggiornaElencoChat();
+    mostraChat(true);
+    apriChat(id);
+  } catch (e) { alert('Nuova chat non riuscita: ' + e.message); }
+}
+
+$('apri-chat').addEventListener('click', () => mostraChat($('chat').hidden));
+$('c-nascondi').addEventListener('click', () => mostraChat(false));
+$('c-scelta').addEventListener('change', (e) => apriChat(e.target.value || null));
+$('c-nuova').addEventListener('click', () => { if ($('c-repo').value) nuovaChat($('c-repo').value); });
+$('c-interrompi').addEventListener('click', () => chatUI.attiva && post(`/api/chat/${chatUI.attiva}/interrompi`).catch((e) => alert(e.message)));
+$('c-chiudi-sessione').addEventListener('click', () => chatUI.attiva && post(`/api/chat/${chatUI.attiva}/chiudi`).catch((e) => alert(e.message)));
+$('c-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const t = $('c-testo').value.trim();
+  if (!t || !chatUI.attiva) { if (!chatUI.attiva) alert('Apri prima una chat (+ Nuova).'); return; }
+  $('c-testo').value = '';
+  try { await post(`/api/chat/${chatUI.attiva}/messaggio`, { testo: t }); }
+  catch (err) { $('c-testo').value = t; alert('Invio non riuscito: ' + err.message); }
+});
+$('c-testo').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('c-form').requestSubmit(); }
+});
+$('c-messaggi').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-decidi]');
+  if (!b) return;
+  const carta = b.closest('[data-perm]');
+  const id = carta.dataset.perm;
+  let corpo;
+  if (b.dataset.decidi === 'risposta') {
+    const risposte = {};
+    for (const q of carta.querySelectorAll('.q')) {
+      const scelte = [...q.querySelectorAll('input:checked')].map((x) => x.value === '__altro' ? x.closest('label').querySelector('.altro').value.trim() : x.value).filter(Boolean);
+      if (!scelte.length) { alert('Rispondi a tutte le domande.'); return; }
+      risposte[q.dataset.domanda] = scelte.join(', ');
+    }
+    corpo = { id, decisione: 'consenti', risposte };
+  } else {
+    corpo = { id, decisione: b.dataset.decidi, motivo: carta.querySelector('.motivo')?.value || '' };
+  }
+  carta.querySelectorAll('button').forEach((x) => (x.disabled = true));
+  try { await post(`/api/chat/${chatUI.attiva}/permesso`, corpo); }
+  catch (err) { alert(err.message); carta.querySelectorAll('button').forEach((x) => (x.disabled = false)); }
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-chat-repo]');
+  if (b) nuovaChat(b.dataset.chatRepo);
+});
+
+(async () => {
+  await aggiornaElencoChat();
+  let attiva = null, aperta = false;
+  try { attiva = localStorage.getItem('chat-attiva'); aperta = localStorage.getItem('chat-aperta') === '1'; } catch {}
+  if (attiva && chatUI.elenco.some((c) => c.id === attiva)) apriChat(attiva);
+  if (aperta) mostraChat(true);
+})();
+setInterval(aggiornaElencoChat, 3000);
+
+aggiorna();
+setInterval(aggiorna, 3000);
+</script>
+</body>
+</html>

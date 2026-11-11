@@ -1,0 +1,10 @@
+# dipendenze e build
+node_modules/
+cruscotto/app/.build/
+cruscotto/app/build/
+
+# dati locali del cruscotto: richieste, comandi, chat (privati)
+cruscotto/dati/
+cruscotto/config.json
+
+.DS_Store

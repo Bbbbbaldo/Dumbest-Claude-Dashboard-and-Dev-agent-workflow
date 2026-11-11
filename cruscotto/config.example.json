@@ -1,0 +1,11 @@
+{
+  "repos": ["~/Projects/mio-progetto"],
+  "nascondiRepo": [],
+  "prefissiPiano": ["piano/"],
+  "minTaskPiano": 2,
+  "ttlGithubSec": 30,
+  "terminale": "Terminal",
+  "comandoAvvio": {
+    "mio-progetto": "claude --worktree issue-{n} \"/task {n}\""
+  }
+}

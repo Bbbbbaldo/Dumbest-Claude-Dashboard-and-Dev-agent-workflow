@@ -1,0 +1,11 @@
+{
+  "name": "flusso-agenti",
+  "owner": { "name": "Bbbbbaldo" },
+  "plugins": [
+    {
+      "name": "flusso-agenti",
+      "source": "./",
+      "description": "Skill /pianifica e /task, agenti revisore e documentatore, hook di protezione ed eventi per il cruscotto delle sessioni."
+    }
+  ]
+}
